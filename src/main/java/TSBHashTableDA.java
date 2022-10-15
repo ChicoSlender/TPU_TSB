@@ -544,7 +544,6 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
 
                 nextOk = false;
 
-                // fail_fast iterator: todo en orden...
                 expectedModCount++;
             }
         }
