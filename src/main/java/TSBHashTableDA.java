@@ -63,7 +63,7 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
      */
     public TSBHashTableDA()
     {
-        this(11, 0.8f);
+        this(11, 0.5f);
     }
 
     /**
@@ -73,7 +73,7 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
      */
     public TSBHashTableDA(int initial_capacity)
     {
-        this(initial_capacity, 0.8f);
+        this(initial_capacity, 0.5f);
     }
 
     /**
@@ -86,7 +86,7 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
      */
     public TSBHashTableDA(int initial_capacity, float load_factor)
     {
-        if(load_factor <= 0) { load_factor = 0.8f; }
+        if(load_factor <= 0) { load_factor = 0.5f; }
         if(initial_capacity <= 0) { initial_capacity = 11; }
         else
         {
@@ -97,7 +97,6 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
         }
 
         this.table = new Entry[initial_capacity] ;
-        Arrays.fill(table, null);
 
         this.initial_capacity = initial_capacity;
         this.load_factor = load_factor;
@@ -111,7 +110,7 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
      */
     public TSBHashTableDA(Map<? extends K,? extends V> t)
     {
-        this(11, 0.8f);
+        this(11, 0.5f);
         this.putAll(t);
     }
 
@@ -119,47 +118,105 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
 
     @Override
     public int size() {
-        return 0;
+        return count;
     }
 
     @Override
     public boolean isEmpty() {
-        return false;
+        return this.count == 0;
     }
 
     @Override
     public boolean containsKey(Object key) {
-        return false;
+        return this.get(key) != null;
     }
 
     @Override
     public boolean containsValue(Object value) {
-        return false;
+        return this.contains(value);
     }
 
     @Override
     public V get(Object key) {
-        return null;
+        if(key == null) {
+            throw new NullPointerException("TSBHashTableDA.get(): parámetro null");
+        }
+
+        int indexOfKey = this.searchForIndexOfKey((K) key);
+
+        V value = null;
+        if (indexOfKey >= 0) {
+            Map.Entry<K, V> entry = this.table[indexOfKey];
+            if (entry != null && !((Entry) entry).isDeleted()) {
+                value = entry.getValue();
+            }
+        }
+
+        return value;
     }
 
     @Override
     public V put(K key, V value) {
-        return null;
+        if (key == null || value == null) {
+            throw new IllegalArgumentException("TSBHashTableDA.put(): ninguno de los parámetros puede ser null");
+        }
+
+        int indexOfKey = this.searchForIndexOfKey(key);
+
+        if (indexOfKey < 0) {
+            throw new IndexOutOfBoundsException("TSBHashTableDA.put(): no se encontró un lugar donde ubicar el par clave-valor");
+        }
+
+        V oldValue = null;
+        Map.Entry<K, V> entry = this.table[indexOfKey];
+        if (entry != null && !((Entry) entry).isDeleted()) {
+            oldValue = entry.getValue();
+            entry.setValue(value);
+        }
+        else {
+            this.table[indexOfKey] = new Entry<>(key, value);
+            this.count++;
+            this.modCount++;
+        }
+
+        return oldValue;
     }
 
     @Override
     public V remove(Object key) {
-        return null;
+        if(key == null) {
+            throw new NullPointerException("TSBHashTableDA.get(): parámetro null");
+        }
+
+        int indexOfKey = this.searchForIndexOfKey((K) key);
+
+        V value = null;
+        if (indexOfKey >= 0) {
+            Map.Entry<K, V> entry = this.table[indexOfKey];
+            if (entry != null && !((Entry<K, V>) entry).isDeleted()) {
+                value = entry.getValue();
+                ((Entry<K, V>) entry).delete();
+                this.modCount++;
+                this.count--;
+            }
+        }
+
+        return value;
     }
 
     @Override
     public void putAll(Map<? extends K, ? extends V> m) {
-
+        for(Map.Entry<? extends K, ? extends V> e : m.entrySet())
+        {
+            this.put(e.getKey(), e.getValue());
+        }
     }
 
     @Override
     public void clear() {
-
+        this.table = new Entry[this.initial_capacity];
+        this.count = 0;
+        this.modCount++;
     }
 
     @Override
@@ -174,7 +231,122 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
 
     @Override
     public Set<Map.Entry<K, V>> entrySet() {
-        return null;
+        if (this.entrySet == null)  {
+            this.entrySet = new EntrySet();
+        }
+
+        return this.entrySet;
+    }
+
+    //************************ Metodos especificos a la implementación de la clase
+
+    /**
+     * Función hash
+     * @param k clave entera
+     * @return indice válido para la clave k para poder acceder a la tabla
+     */
+    private int hash(int k)
+    {
+        return hash(k, this.table.length);
+    }
+
+    /**
+     * Función hash
+     * @param key objeto que representa una clave valida para la tabla
+     * @return indice válido para la clave k para poder acceder a la tabla
+     */
+    private int hash(K key)
+    {
+        return hash(key.hashCode(), this.table.length);
+    }
+
+    /**
+     * Función hash
+     * @param key objeto que representa una clave valida para la tabla
+     * @param t tamaño de tabla
+     * @return indice válido para la clave k para poder acceder a una tabla del tamaño especificado
+     */
+    private int hash(K key, int t)
+    {
+        return hash(key.hashCode(), t);
+    }
+
+    /**
+     * Función hash
+     * @param k clave entera
+     * @param t tamaño de tabla
+     * @return indice válido para la clave k para poder acceder a una tabla del tamaño especificado
+     */
+    private int hash(int k, int t)
+    {
+        if(k < 0) k *= -1;
+        return k % t;
+    }
+
+    /**
+     * Busca en el arreglo mediante exploración lineal el indice donde se encuentra ubicado el objeto con la clave dada o el primer lugar disponible para su insercion
+     * El elemento del arreglo estará disponible cuando sea nulo (nunca fue ocupado) o cuando esté marcado como "tumba" (entrada eliminada).
+     * La gestión de colisiones mediante direccionamiento abierto se encuentra implementada en este método
+     * @param key clave cuyo indice debe buscarse
+     * @return indice del par donde se encuentra la clave o un lugar disponible para su inserción.
+     * */
+    private int searchForIndexOfKey(K key) {
+        int motherIndex = this.hash(key);
+
+        int tombstoneIndex = -1;
+        Map.Entry<K, V> currentEntry;
+        for (int i = motherIndex; i < this.table.length; i++) {
+            currentEntry = this.table[i];
+
+            if (currentEntry == null) {
+                return tombstoneIndex < 0? i : tombstoneIndex;
+            }
+
+            if (tombstoneIndex < 0 && ((Entry) currentEntry).isDeleted()) {
+                tombstoneIndex = i;
+            }
+
+            if (currentEntry.getKey().equals(key)) {
+                return i;
+            }
+        }
+
+        for (int i = 0; i < motherIndex; i++) {
+            currentEntry = this.table[i];
+
+            if (currentEntry == null) {
+                return tombstoneIndex < 0 ? i : tombstoneIndex;
+            }
+
+            if (tombstoneIndex < 0 && ((Entry) currentEntry).isDeleted()) {
+                tombstoneIndex = i;
+            }
+
+            if (currentEntry.getKey().equals(key)) {
+                return i;
+            }
+        }
+
+        return tombstoneIndex;
+    }
+
+    /**
+     * Determina si alguna clave de la tabla está asociada al objeto value que
+     * entra como parámetro. Equivale a containsValue().
+     * @param value el objeto a buscar en la tabla.
+     * @return true si alguna clave está asociada efectivamente a ese value.
+     */
+    public boolean contains(Object value)
+    {
+        Set<Map.Entry<K, V>> entries = this.entrySet();
+
+        for (Map.Entry<K, V> entry : entries) {
+            if (Objects.equals(value, entry.getValue())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     //************************ Clases internas de soporte
@@ -187,6 +359,7 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
 
         private K key;
         private V value;
+        private boolean deleted;
 
         /**
          * Constructor de la clase
@@ -229,7 +402,7 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
             if (this == obj) return true;
             if (obj == null || getClass() != obj.getClass()) return false;
             final Entry other = (Entry) obj;
-            return key.equals(other.key) && value.equals(other.value);
+            return Objects.equals(this.key, other.key) && Objects.equals(this.value, other.value);
         }
 
         @Override
@@ -244,5 +417,137 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
         public String toString() {
             return "(" + key.toString() + ", " + value.toString() + ")";
         }
+
+        /**
+         * Comprueba si el objeto fue marcado como "tumba" (borrado lógico)*/
+        public boolean isDeleted() {
+            return deleted;
+        }
+
+        /**
+         * Marca al objeto como "tumba" (borrado lógico)*/
+        public boolean delete() {
+            this.deleted = true;
+            return deleted;
+        }
+    }
+
+    private class EntrySet extends AbstractSet<Map.Entry<K, V>> {
+
+        @Override
+        public int size() {
+            return TSBHashTableDA.this.count;
+        }
+
+        @Override
+        public void clear() {
+            TSBHashTableDA.this.clear();
+        }
+
+        /**
+         * Comprueba si la vista (y por tanto la tabla hash) contiene el par especificado*/
+        @Override
+        public boolean contains(Object o) {
+           if (o == null) return false;
+           if (!(o instanceof Entry)) return false;
+
+           Map.Entry<K, V> entry = (Map.Entry<K, V>) o;
+           K key = entry.getKey();
+           int index = TSBHashTableDA.this.hash(key);
+
+           Map.Entry<K, V> tableEntry = TSBHashTableDA.this.table[index];
+
+           return Objects.equals(entry, tableEntry);
+        }
+
+        @Override
+        public boolean remove(Object o) {
+            if (o == null) {
+                throw new NullPointerException("remove(): parámetro null");
+            }
+            if (!(o instanceof Entry)) return false;
+
+            Map.Entry<K, V> entry = (Map.Entry<K, V>) o;
+            K key = entry.getKey();
+            V removedValue = TSBHashTableDA.this.remove(key);
+
+            return removedValue != null;
+        }
+
+        @Override
+        public Iterator<Map.Entry<K, V>> iterator() {
+            return new EntrySetIterator();
+        }
+
+        private class EntrySetIterator implements Iterator<Map.Entry<K, V>> {
+            private int currentEntry;
+            private int lastEntry;
+            private boolean nextOk;
+            private int expectedModCount;
+
+            private EntrySetIterator() {
+                currentEntry = -1;
+                lastEntry = -1;
+                nextOk = false;
+                expectedModCount = TSBHashTableDA.this.modCount;
+            }
+
+
+            @Override
+            public boolean hasNext() {
+                if (TSBHashTableDA.this.isEmpty()) return false;
+                Map.Entry<K, V>[] table = TSBHashTableDA.this.table;
+                if (currentEntry >= table.length) return false;
+
+                int nextEntry = currentEntry + 1;
+                while (nextEntry < table.length && table[nextEntry] == null) {
+                    nextEntry++;
+                }
+
+                return nextEntry < table.length;
+            }
+
+            @Override
+            public Map.Entry<K, V> next() {
+                if (expectedModCount != TSBHashTableDA.this.modCount) {
+                    throw new ConcurrentModificationException("EntrySetIterator.next(): modificación inesperada de tabla");
+                }
+                if (!this.hasNext()) {
+                    throw new NoSuchElementException("EntrySetIterator.next(): no hay siguiente elemento");
+                }
+
+                Map.Entry<K, V>[] table = TSBHashTableDA.this.table;
+
+                lastEntry = currentEntry;
+                currentEntry++;
+                while(table[currentEntry] == null) {
+                    currentEntry++;
+                }
+
+                nextOk = true;
+                return table[currentEntry];
+            }
+
+            @Override
+            public void remove() {
+                if (!nextOk) {
+                    throw new IllegalStateException("EntrySetIterator.remove(): se debe invocar a next() antes de volver a invocar a remove()");
+                }
+
+                Map.Entry<K, V> removed = TSBHashTableDA.this.table[currentEntry];
+                EntrySet.this.remove(removed);
+
+                if(lastEntry != currentEntry)
+                {
+                    currentEntry = lastEntry;
+                }
+
+                nextOk = false;
+
+                // fail_fast iterator: todo en orden...
+                expectedModCount++;
+            }
+        }
+
     }
 }
