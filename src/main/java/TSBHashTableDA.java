@@ -19,7 +19,8 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
     //************************ Constantes (privadas o públicas).
 
     // El tamaño máximo que podrá tener el arreglo interno de soporte
-    private final static int MAX_SIZE = Integer.MAX_VALUE;
+    // Se utiliza el numero dado ya que se trata del numero primo más cercano al valor devuelto por Integer.MAX_VALUE
+    private final static int MAX_SIZE = 2147483587;
 
 
     //************************ Atributos privados (estructurales).
@@ -28,13 +29,16 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
     private Map.Entry<K, V>[] table;
 
     // el tamaño inicial de la tabla (tamaño con el que fue creada)
-    private int initial_capacity;
+    private int initialCapacity;
 
     // la cantidad de objetos que contiene la tabla
     private int count;
 
     // el factor de carga utilizado para determinar si hace falta un rehashing de la tabla
-    private float load_factor;
+    private float loadFactor;
+
+    // Generador auxiliar de numeros primos
+    private PrimeNumberGenerator primeGenerator;
 
     //************************ Atributos privados (para gestionar las vistas).
 
@@ -69,11 +73,11 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
     /**
      * Crea una tabla vacía, con la capacidad inicial indicada y con factor
      * de carga igual a 0.5f.
-     * @param initial_capacity la capacidad inicial de la tabla.
+     * @param initialCapacity la capacidad inicial de la tabla.
      */
-    public TSBHashTableDA(int initial_capacity)
+    public TSBHashTableDA(int initialCapacity)
     {
-        this(initial_capacity, 0.5f);
+        this(initialCapacity, 0.5f);
     }
 
     /**
@@ -81,27 +85,29 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
      * de carga indicado. Si la capacidad inicial indicada por initial_capacity
      * es menor o igual a 0, la tabla será creada de tamaño 11. Si el factor de
      * carga indicado es negativo o cero, se ajustará a 0.5f.
-     * @param initial_capacity la capacidad inicial de la tabla.
-     * @param load_factor el factor de carga de la tabla.
+     * @param initialCapacity la capacidad inicial de la tabla.
+     * @param loadFactor el factor de carga de la tabla.
      */
-    public TSBHashTableDA(int initial_capacity, float load_factor)
+    public TSBHashTableDA(int initialCapacity, float loadFactor)
     {
-        if(load_factor <= 0) { load_factor = 0.5f; }
-        if(initial_capacity <= 0) { initial_capacity = 11; }
+        if(loadFactor <= 0) { loadFactor = 0.5f; }
+        if(initialCapacity <= 0) { initialCapacity = 11; }
         else
         {
-            if(initial_capacity > TSBHashTableDA.MAX_SIZE)
+            if(initialCapacity > TSBHashTableDA.MAX_SIZE)
             {
-                initial_capacity = TSBHashTableDA.MAX_SIZE;
+                initialCapacity = TSBHashTableDA.MAX_SIZE;
             }
         }
 
-        this.table = new Entry[initial_capacity] ;
+        this.table = new Entry[initialCapacity];
 
-        this.initial_capacity = initial_capacity;
-        this.load_factor = load_factor;
+        this.initialCapacity = initialCapacity;
+        this.loadFactor = loadFactor;
         this.count = 0;
         this.modCount = 0;
+
+        this.primeGenerator = new PrimeNumberGenerator();
     }
 
     /**
@@ -177,6 +183,9 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
             this.table[indexOfKey] = new Entry<>(key, value);
             this.count++;
             this.modCount++;
+            if (this.isTableOverloaded()) {
+                this.rehash();
+            }
         }
 
         return oldValue;
@@ -214,7 +223,7 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
 
     @Override
     public void clear() {
-        this.table = new Entry[this.initial_capacity];
+        this.table = new Entry[this.initialCapacity];
         this.count = 0;
         this.modCount++;
     }
@@ -347,6 +356,41 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
         }
 
         return false;
+    }
+
+    /**
+     * Incrementa el tamaño de la tabla y reorganiza su contenido.
+     * Se invoca automaticamente cuando se detecta que la proporción entre
+     * elementos almacenados en la tabla y su tamaño supera el valor loadFactor.
+     * También se asegura que el tamaño de la tabla siempre se trate de un numero
+     * primo y que no supere el valor maximo dado por la constante MAX_SIZE
+     */
+    private void rehash() {
+        int oldLength = this.table.length;
+        int newLength = oldLength * 2 + 1;
+        newLength = this.primeGenerator.nextPrime(newLength);
+        newLength = Math.min(newLength, MAX_SIZE);
+
+        Map.Entry<K, V>[] oldTable = this.table;
+        this.table = new Entry[newLength];
+
+        this.modCount++;
+        this.count = 0;
+
+        for (Map.Entry<K, V> entry : oldTable) {
+            if (entry != null && !((Entry) entry).isDeleted()) {
+                this.put(entry.getKey(), entry.getValue());
+            }
+        }
+    }
+
+    /**
+     * Calcula la proporción entre la cantidad de elementos almacenados y el tamaño de la tabla
+     * y comprueba si superó el factor de carga, necesitando de un rehashing si fuera el caso
+     * @return si la tabla supera el factor de carga o no*/
+    private boolean isTableOverloaded() {
+        double length = this.table.length;
+        return this.count / length >= 0.5;
     }
 
     //************************ Clases internas de soporte
@@ -500,7 +544,7 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
                 if (currentEntry >= table.length) return false;
 
                 int nextEntry = currentEntry + 1;
-                while (nextEntry < table.length && table[nextEntry] == null) {
+                while (nextEntry < table.length && (table[nextEntry] == null || ((Entry) table[nextEntry]).isDeleted())) {
                     nextEntry++;
                 }
 
@@ -520,7 +564,7 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
 
                 lastEntry = currentEntry;
                 currentEntry++;
-                while(table[currentEntry] == null) {
+                while(table[currentEntry] == null || ((Entry) table[currentEntry]).isDeleted()) {
                     currentEntry++;
                 }
 
