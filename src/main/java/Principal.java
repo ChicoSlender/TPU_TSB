@@ -23,7 +23,7 @@ public class Principal {
         System.out.println(alex);
         System.out.println(R);
 
-        System.out.println("Ta ETESECH? " + hashTable.containsValue(new Persona("Ete", "Sech")));
+        System.out.println(hashTable.toString());
     }
 }
 

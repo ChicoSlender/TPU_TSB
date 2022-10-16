@@ -247,6 +247,24 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
         return this.entrySet;
     }
 
+    //************************ Métodos redefinidos heredados de Object
+
+    @Override
+    public String toString() {
+        StringBuilder string = new StringBuilder();
+        Set<Map.Entry<K, V>> entries = this.entrySet();
+
+        string.append("{\n");
+        for (Map.Entry<K, V> entry : entries) {
+            string.append(entry.toString());
+            string.append(",\n");
+        }
+        string.append("}");
+
+        return string.toString();
+    }
+
+
     //************************ Metodos especificos a la implementación de la clase
 
     /**
