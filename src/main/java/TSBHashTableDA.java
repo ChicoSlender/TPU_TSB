@@ -264,7 +264,69 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
         return string.toString();
     }
 
+    @Override
+    protected Object clone() throws CloneNotSupportedException {
+        TSBHashTableDA<K, V> clonedHashTable = (TSBHashTableDA<K, V>) super.clone();
+        clonedHashTable.primeGenerator = new PrimeNumberGenerator();
+        clonedHashTable.entrySet = null;
+        clonedHashTable.keySet = null;
+        clonedHashTable.values = null;
+        clonedHashTable.count = 0;
+        clonedHashTable.table = new Entry[this.table.length];
+        clonedHashTable.putAll(this);
+        clonedHashTable.modCount = 0;
 
+        return clonedHashTable;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(!(obj instanceof Map)) { return false; }
+
+        Map<K, V> t = (Map<K, V>) obj;
+        if(t.size() != this.size()) { return false; }
+
+        try
+        {
+            Set<Map.Entry<K,V>> entries = this.entrySet();
+            for (Map.Entry<K, V> entry : entries) {
+                K key = entry.getKey();
+                V value = entry.getValue();
+                if(t.get(key) == null) {
+                    return false;
+                }
+                else if(!value.equals(t.get(key)))
+                {
+                    return false;
+                }
+            }
+        }
+        catch (ClassCastException | NullPointerException e)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Retorna un hash code para la tabla completa.
+     * @return un hash code para la tabla.
+     */
+    @Override
+    public int hashCode() {
+        int[] weights = new int[] {1, 2, 3, 5, 7, 11};
+
+        int hash = 0;
+        int i = 0;
+        Set<Map.Entry<K,V>> entries = this.entrySet();
+        for (Map.Entry<K, V> entry : entries) {
+            hash += weights[i % weights.length] * entry.hashCode() / this.count;
+            i++;
+        }
+
+        return hash;
+    }
     //************************ Metodos especificos a la implementación de la clase
 
     /**
