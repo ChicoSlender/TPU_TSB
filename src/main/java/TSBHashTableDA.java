@@ -164,7 +164,7 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
     @Override
     public V put(K key, V value) {
         if (key == null || value == null) {
-            throw new IllegalArgumentException("TSBHashTableDA.put(): ninguno de los parámetros puede ser null");
+            throw new NullPointerException("TSBHashTableDA.put(): ninguno de los parámetros puede ser null");
         }
 
         int indexOfKey = this.searchForIndexOfKey(key);
