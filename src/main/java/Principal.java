@@ -17,15 +17,17 @@ public class Principal {
         hashTable.put("Juan", new Persona("Juan", "GT"));
         hashTable.put("Benja", new Persona("Benja", "GT"));
 
-        System.out.println("KEYS");
-        for (String key : hashTable.keySet()) {
-            System.out.println(key);
-        }
-
-        System.out.println("VALUES");
-        for (Persona value : hashTable.values()) {
-            System.out.println(value);
-        }
+        hashTable.put("XRobertoX", new Persona("Roberto", "Perez"));
+        hashTable.put("XAlejandroX", new Persona("Alejandro", "ElCapo"));
+        hashTable.put("XLionel", new Persona("Lionel", "Messi"));
+        hashTable.put("XR", new Persona("R", "R"));
+        hashTable.put("XE", new Persona("E", "E"));
+        hashTable.put("XG", new Persona("G", "G"));
+        hashTable.put("XEteX", new Persona("Ete", "Sech"));
+        hashTable.put("XLorena", new Persona("Lorena", "Torres"));
+        hashTable.put("XRambo", new Persona("Rambo", "Weon"));
+        hashTable.put("XJuan", new Persona("Juan", "GT"));
+        hashTable.put("XBenja", new Persona("Benja", "GT"));
     }
 }
 

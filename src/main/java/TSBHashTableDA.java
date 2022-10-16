@@ -381,7 +381,7 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
     }
 
     /**
-     * Busca en el arreglo mediante exploración lineal el indice donde se encuentra ubicado el objeto con la clave dada o el primer lugar disponible para su insercion
+     * Busca en el arreglo mediante exploración cuadrática el indice donde se encuentra ubicado el objeto con la clave dada o el primer lugar disponible para su insercion
      * El elemento del arreglo estará disponible cuando sea nulo (nunca fue ocupado) o cuando esté marcado como "tumba" (entrada eliminada).
      * La gestión de colisiones mediante direccionamiento abierto se encuentra implementada en este método
      * @param key clave cuyo indice debe buscarse
@@ -392,35 +392,20 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
 
         int tombstoneIndex = -1;
         Map.Entry<K, V> currentEntry;
-        for (int i = motherIndex; i < this.table.length; i++) {
-            currentEntry = this.table[i];
+        for (int i = 0; i < this.table.length; i++) {
+            int currentIndex = (motherIndex + (int)Math.pow(i, 2)) % this.table.length;
+            currentEntry = this.table[currentIndex];
 
             if (currentEntry == null) {
-                return tombstoneIndex < 0? i : tombstoneIndex;
+                return tombstoneIndex < 0? currentIndex : tombstoneIndex;
             }
 
             if (tombstoneIndex < 0 && ((Entry) currentEntry).isDeleted()) {
-                tombstoneIndex = i;
+                tombstoneIndex = currentIndex;
             }
 
             if (currentEntry.getKey().equals(key)) {
-                return i;
-            }
-        }
-
-        for (int i = 0; i < motherIndex; i++) {
-            currentEntry = this.table[i];
-
-            if (currentEntry == null) {
-                return tombstoneIndex < 0 ? i : tombstoneIndex;
-            }
-
-            if (tombstoneIndex < 0 && ((Entry) currentEntry).isDeleted()) {
-                tombstoneIndex = i;
-            }
-
-            if (currentEntry.getKey().equals(key)) {
-                return i;
+                return currentIndex;
             }
         }
 
