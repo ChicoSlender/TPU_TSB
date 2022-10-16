@@ -230,12 +230,20 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
 
     @Override
     public Set<K> keySet() {
-        return null;
+        if (this.keySet == null)  {
+            this.keySet = new KeySet();
+        }
+
+        return this.keySet;
     }
 
     @Override
     public Collection<V> values() {
-        return null;
+        if (this.values == null)  {
+            this.values = new ValueCollection();
+        }
+
+        return this.values;
     }
 
     @Override
@@ -556,6 +564,16 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
         }
     }
 
+    /**
+     * Clase interna que representa una vista de todos los PARES mapeados en la
+     * tabla: si la vista cambia, cambia también la tabla que le da respaldo, y
+     * viceversa. La vista es stateless: no mantiene estado alguno (es decir, no
+     * contiene datos ella misma, sino que accede y gestiona directamente datos
+     * de otra fuente), por lo que no tiene atributos y sus métodos gestionan en
+     * forma directa el contenido de la tabla. Están soportados los metodos para
+     * eliminar un objeto (remove()), eliminar todo el contenido (clear) y la
+     * creación de un Iterator (que incluye el método Iterator.remove()).
+     */
     private class EntrySet extends AbstractSet<Map.Entry<K, V>> {
 
         @Override
@@ -593,9 +611,8 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
 
             Map.Entry<K, V> entry = (Map.Entry<K, V>) o;
             K key = entry.getKey();
-            V removedValue = TSBHashTableDA.this.remove(key);
 
-            return removedValue != null;
+            return TSBHashTableDA.this.remove(key) != null;
         }
 
         @Override
@@ -672,5 +689,270 @@ public class TSBHashTableDA<K, V> implements Map<K, V>, Cloneable, Serializable 
             }
         }
 
+    }
+
+    /**
+     * Clase interna que representa una vista de todas los Claves mapeadas en la
+     * tabla: si la vista cambia, cambia también la tabla que le da respaldo, y
+     * viceversa. La vista es stateless: no mantiene estado alguno (es decir, no
+     * contiene datos ella misma, sino que accede y gestiona directamente datos
+     * de otra fuente), por lo que no tiene atributos y sus métodos gestionan en
+     * forma directa el contenido de la tabla. Están soportados los metodos para
+     * eliminar un objeto (remove()), eliminar todo el contenido (clear) y la
+     * creación de un Iterator (que incluye el método Iterator.remove()).
+     */
+    private class KeySet extends AbstractSet<K>
+    {
+        @Override
+        public Iterator<K> iterator()
+        {
+            return new KeySetIterator();
+        }
+
+        @Override
+        public int size()
+        {
+            return TSBHashTableDA.this.count;
+        }
+
+        @Override
+        public boolean contains(Object o)
+        {
+            return TSBHashTableDA.this.containsKey(o);
+        }
+
+        @Override
+        public boolean remove(Object o)
+        {
+            return (TSBHashTableDA.this.remove(o) != null);
+        }
+
+        @Override
+        public void clear()
+        {
+            TSBHashTableDA.this.clear();
+        }
+
+        private class KeySetIterator implements Iterator<K>
+        {
+            private int currentEntry;
+            private int lastEntry;
+
+            private boolean nextOk;
+
+            private int expectedModCount;
+
+            /**
+             * Crea un iterador comenzando en la primera lista. Activa el
+             * mecanismo fail-fast.
+             */
+            public KeySetIterator()
+            {
+                lastEntry = -1;
+                currentEntry = -1;
+                nextOk = false;
+                expectedModCount = TSBHashTableDA.this.modCount;
+            }
+
+            /**
+             * Determina si hay al menos un elemento en la tabla que no haya
+             * sido retornado por next().
+             */
+            @Override
+            public boolean hasNext()
+            {
+                if (TSBHashTableDA.this.isEmpty()) return false;
+                Map.Entry<K, V>[] table = TSBHashTableDA.this.table;
+                if (currentEntry >= table.length) return false;
+
+                int nextEntry = currentEntry + 1;
+                while (nextEntry < table.length && (table[nextEntry] == null || ((Entry) table[nextEntry]).isDeleted())) {
+                    nextEntry++;
+                }
+
+                return nextEntry < table.length;
+            }
+
+            /*
+             * Retorna el siguiente elemento disponible en la tabla.
+             */
+            @Override
+            public K next()
+            {
+                if (expectedModCount != TSBHashTableDA.this.modCount) {
+                    throw new ConcurrentModificationException("KeySetIterator.next(): modificación inesperada de tabla");
+                }
+                if (!this.hasNext()) {
+                    throw new NoSuchElementException("KeySetIterator.next(): no hay siguiente elemento");
+                }
+
+                Map.Entry<K, V>[] table = TSBHashTableDA.this.table;
+
+                lastEntry = currentEntry;
+                currentEntry++;
+                while(table[currentEntry] == null || ((Entry) table[currentEntry]).isDeleted()) {
+                    currentEntry++;
+                }
+
+                nextOk = true;
+                return table[currentEntry].getKey();
+            }
+
+            /*
+             * Remueve el elemento actual de la tabla, dejando el iterador en la
+             * posición anterior al que fue removido. El elemento removido es el
+             * que fue retornado la última vez que se invocó a next(). El método
+             * sólo puede ser invocado una vez por cada invocación a next().
+             */
+            @Override
+            public void remove()
+            {
+                if (!nextOk) {
+                    throw new IllegalStateException("KeySetIterator.remove(): se debe invocar a next() antes de volver a invocar a remove()");
+                }
+
+                Map.Entry<K, V> removed = TSBHashTableDA.this.table[currentEntry];
+                KeySet.this.remove(removed.getKey());
+
+                if(lastEntry != currentEntry)
+                {
+                    currentEntry = lastEntry;
+                }
+
+                nextOk = false;
+
+                expectedModCount++;
+            }
+        }
+    }
+
+    /*
+     * Clase interna que representa una vista de todos los VALORES mapeados en
+     * la tabla: si la vista cambia, cambia también la tabla que le da respaldo,
+     * y viceversa. La vista es stateless: no mantiene estado alguno (es decir,
+     * no contiene datos ella misma, sino que accede y gestiona directamente los
+     * de otra fuente), por lo que no tiene atributos y sus métodos gestionan en
+     * forma directa el contenido de la tabla. Están soportados los metodos para
+     * eliminar un objeto (remove()), eliminar todo el contenido (clear) y la
+     * creación de un Iterator (que incluye el método Iterator.remove()).
+     */
+    private class ValueCollection extends AbstractCollection<V>
+    {
+        @Override
+        public Iterator<V> iterator()
+        {
+            return new ValueCollectionIterator();
+        }
+
+        @Override
+        public int size()
+        {
+            return TSBHashTableDA.this.count;
+        }
+
+        @Override
+        public boolean contains(Object o)
+        {
+            return TSBHashTableDA.this.containsValue(o);
+        }
+
+        @Override
+        public void clear()
+        {
+            TSBHashTableDA.this.clear();
+        }
+
+        private class ValueCollectionIterator implements Iterator<V>
+        {
+
+            private int currentEntry;
+            private int lastEntry;
+            private boolean nextOk;
+
+            private int expectedModCount;
+
+            /*
+             * Crea un iterador comenzando en la primera lista. Activa el
+             * mecanismo fail-fast.
+             */
+            public ValueCollectionIterator()
+            {
+                currentEntry = -1;
+                lastEntry = -1;
+                nextOk = false;
+                expectedModCount = TSBHashTableDA.this.modCount;
+            }
+
+            /*
+             * Determina si hay al menos un elemento en la tabla que no haya
+             * sido retornado por next().
+             */
+            @Override
+            public boolean hasNext()
+            {
+                if (TSBHashTableDA.this.isEmpty()) return false;
+                Map.Entry<K, V>[] table = TSBHashTableDA.this.table;
+                if (currentEntry >= table.length) return false;
+
+                int nextEntry = currentEntry + 1;
+                while (nextEntry < table.length && (table[nextEntry] == null || ((Entry) table[nextEntry]).isDeleted())) {
+                    nextEntry++;
+                }
+
+                return nextEntry < table.length;
+            }
+
+            /*
+             * Retorna el siguiente elemento disponible en la tabla.
+             */
+            @Override
+            public V next()
+            {
+                if (expectedModCount != TSBHashTableDA.this.modCount) {
+                    throw new ConcurrentModificationException("ValueCollectionIterator.next(): modificación inesperada de tabla");
+                }
+                if (!this.hasNext()) {
+                    throw new NoSuchElementException("ValueCollectionIterator.next(): no hay siguiente elemento");
+                }
+
+                Map.Entry<K, V>[] table = TSBHashTableDA.this.table;
+
+                lastEntry = currentEntry;
+                currentEntry++;
+                while(table[currentEntry] == null || ((Entry) table[currentEntry]).isDeleted()) {
+                    currentEntry++;
+                }
+
+                nextOk = true;
+                return table[currentEntry].getValue();
+            }
+
+            /*
+             * Remueve el elemento actual de la tabla, dejando el iterador en la
+             * posición anterior al que fue removido. El elemento removido es el
+             * que fue retornado la última vez que se invocó a next(). El método
+             * sólo puede ser invocado una vez por cada invocación a next().
+             */
+            @Override
+            public void remove()
+            {
+                if(!nextOk)
+                {
+                    throw new IllegalStateException("ValueCollectionIterator.remove(): debe invocar a next() antes de remove()...");
+                }
+
+                Map.Entry<K, V> removed = TSBHashTableDA.this.table[currentEntry];
+
+                TSBHashTableDA.this.remove(removed.getKey());
+
+                if(lastEntry != currentEntry)
+                {
+                    currentEntry = lastEntry;
+                }
+
+                nextOk = false;
+                expectedModCount++;
+            }
+        }
     }
 }
